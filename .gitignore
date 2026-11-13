@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Local runtime data (per-user language choices)
+data/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs and editor files
+*.log
+.DS_Store
+.idea/
+.vscode/

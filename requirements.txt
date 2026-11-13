@@ -1,0 +1,3 @@
+python-telegram-bot[webhooks]==22.8
+addisai==0.14.0
+python-dotenv==1.2.4
