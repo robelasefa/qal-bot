@@ -15,6 +15,17 @@ def test_new_stats_are_empty(clock) -> None:
     assert stats.seconds_since_activity() is None
 
 
+def test_record_user_counts_users_without_a_request(clock) -> None:
+    stats = Stats(clock=clock)
+
+    stats.record_user(1)
+    stats.record_user(2)
+    stats.record_user(1)
+
+    assert stats.user_count == 2
+    assert stats.requests == 0
+
+
 def test_requests_track_users_languages_and_audio(clock) -> None:
     stats = Stats(clock=clock)
 

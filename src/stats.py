@@ -30,8 +30,12 @@ class Stats:
 
     @property
     def user_count(self) -> int:
-        """How many distinct users have submitted audio."""
+        """How many distinct users have interacted with the bot."""
         return len(self._users)
+
+    def record_user(self, user_id: int) -> None:
+        """Remember that a user interacted, even without sending audio."""
+        self._users.add(user_id)
 
     def record_request(
         self,
@@ -40,7 +44,7 @@ class Stats:
         audio_seconds: float,
     ) -> None:
         """Count an accepted request just before transcription starts."""
-        self._users.add(user_id)
+        self.record_user(user_id)
         self.requests += 1
         self.languages[language] += 1
         self.audio_seconds += max(0.0, audio_seconds)

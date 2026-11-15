@@ -1,5 +1,6 @@
 """Tests for small pure handler and formatting helpers."""
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +11,13 @@ from src.formatting import (
     format_wait,
     split_text,
 )
-from src.handlers import audio_suffix, is_allowed, is_owner
+from src.handlers import (
+    audio_suffix,
+    is_allowed,
+    is_owner,
+    language_chosen,
+    language_keyboard,
+)
 
 
 @pytest.mark.parametrize(
@@ -154,3 +161,43 @@ def test_is_owner_matches_only_the_owner_id() -> None:
 )
 def test_format_ago(seconds: float, expected: str) -> None:
     assert format_ago(seconds) == expected
+
+
+def test_language_keyboard_ends_with_a_done_button() -> None:
+    markup = language_keyboard("am")
+    last_row = markup.inline_keyboard[-1]
+
+    assert len(last_row) == 1
+    assert last_row[0].text == "Done"
+    assert last_row[0].callback_data == "lang:done"
+
+
+class FakeQuery:
+    def __init__(self) -> None:
+        self.data = "lang:done"
+        self.answered: list[str] = []
+        self.edited_markup = None
+
+    async def answer(self, text="", show_alert=False):
+        self.answered.append(text)
+
+    async def edit_message_reply_markup(self, reply_markup=None):
+        self.edited_markup = reply_markup
+
+
+def test_done_button_removes_the_keyboard() -> None:
+    query = FakeQuery()
+    update = SimpleNamespace(callback_query=query)
+    services = SimpleNamespace(
+        settings=SimpleNamespace(allowed_user_ids=frozenset(), owner_user_id=None),
+        languages=SimpleNamespace(get=lambda uid: "am", set=lambda uid, code: None),
+        stats=SimpleNamespace(record_user=lambda uid: None),
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(bot_data={"services": services})
+    )
+
+    asyncio.run(language_chosen(update, context))
+
+    assert query.answered == ["Done."]
+    assert query.edited_markup is None

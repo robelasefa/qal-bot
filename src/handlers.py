@@ -100,6 +100,7 @@ def language_keyboard(current: str) -> InlineKeyboardMarkup:
         ]
         for code, label in LANGUAGES.items()
     ]
+    rows.append([InlineKeyboardButton("Done", callback_data="lang:done")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -135,6 +136,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await message.reply_text(PRIVATE_BOT_MESSAGE)
         return
 
+    services.stats.record_user(user.id)
     current = services.languages.get(user.id)
 
     commands = (
@@ -163,20 +165,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await message.reply_text(PRIVATE_BOT_MESSAGE)
         return
 
-    settings = services.settings
-    languages = ", ".join(LANGUAGES.values())
+    services.stats.record_user(user.id)
 
     await message.reply_text(
         "How to use Qal:\n\n"
         "1. Send a voice message or an audio file.\n"
         "2. I transcribe it and reply with the text.\n\n"
-        f"Languages: {languages}. Use /language.\n"
-        f"Limits: {format_duration(settings.max_audio_seconds)} per audio, "
-        f"{settings.rate_limit_per_hour} transcriptions per hour.\n"
-        f"The bot also has a shared limit of "
-        f"{settings.daily_transcription_limit} transcriptions per day.\n\n"
-        "The audio file is deleted from the bot right after transcription. "
-        "The bot does not store audio or transcripts."
+        "Use /language to pick a language."
     )
 
 
@@ -228,6 +223,7 @@ async def language_command(
         await message.reply_text(PRIVATE_BOT_MESSAGE)
         return
 
+    services.stats.record_user(user.id)
     current = services.languages.get(user.id)
 
     await message.reply_text(
@@ -245,6 +241,14 @@ async def language_chosen(
         return
 
     code = query.data.removeprefix("lang:")
+    if code == "done":
+        await query.answer("Done.")
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except TelegramError:
+            logger.warning("Could not remove the language keyboard")
+        return
+
     if code not in LANGUAGES:
         await query.answer("Unknown language.", show_alert=True)
         return
@@ -255,6 +259,8 @@ async def language_chosen(
     if not is_allowed(services, user_id):
         await query.answer("This bot is private.", show_alert=True)
         return
+
+    services.stats.record_user(user_id)
 
     if services.languages.get(user_id) == code:
         await query.answer(f"Already using {language_label(code)}.")
@@ -284,6 +290,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await message.reply_text(PRIVATE_BOT_MESSAGE)
         return
 
+    services.stats.record_user(user.id)
+
     await message.reply_text(
         "Send me a voice message or an audio file. "
         "Use /help to see how it works."
@@ -306,6 +314,8 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not is_allowed(services, user.id):
         await message.reply_text(PRIVATE_BOT_MESSAGE)
         return
+
+    services.stats.record_user(user.id)
 
     # Duration and size checks happen before consuming quota.
     duration = int(media.duration or 0)
