@@ -27,7 +27,7 @@ from .formatting import (
     format_wait,
     split_text,
 )
-from .languages import LANGUAGES, LanguageStore, language_label
+from .languages import DEFAULT_LANGUAGE, LANGUAGES, LanguageStore, language_label
 from .rate_limit import DailyBudget, RateLimiter
 from .stats import Stats
 from .transcriber import TranscriptionError, fetch_usage, transcribe_audio
@@ -91,15 +91,14 @@ def is_owner(services: Services, user_id: int) -> bool:
 
 def language_keyboard(current: str) -> InlineKeyboardMarkup:
     """One button per language, with a check mark on the current one."""
-    rows = [
-        [
-            InlineKeyboardButton(
-                ("✅ " if code == current else "") + label,
-                callback_data=f"lang:{code}",
-            )
-        ]
+    buttons = [
+        InlineKeyboardButton(
+            ("✅ " if code == current else "") + label,
+            callback_data=f"lang:{code}",
+        )
         for code, label in LANGUAGES.items()
     ]
+    rows = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
     rows.append([InlineKeyboardButton("Done", callback_data="lang:done")])
     return InlineKeyboardMarkup(rows)
 
@@ -243,10 +242,17 @@ async def language_chosen(
     code = query.data.removeprefix("lang:")
     if code == "done":
         await query.answer("Done.")
+        current = DEFAULT_LANGUAGE
+        if query.from_user is not None:
+            services: Services = context.application.bot_data["services"]
+            current = services.languages.get(query.from_user.id)
         try:
-            await query.edit_message_reply_markup(reply_markup=None)
+            await query.edit_message_text(
+                f"Current language: {language_label(current)}.",
+                reply_markup=None,
+            )
         except TelegramError:
-            logger.warning("Could not remove the language keyboard")
+            logger.warning("Could not update the language message")
         return
 
     if code not in LANGUAGES:

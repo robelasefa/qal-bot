@@ -175,17 +175,20 @@ def test_language_keyboard_ends_with_a_done_button() -> None:
 class FakeQuery:
     def __init__(self) -> None:
         self.data = "lang:done"
+        self.from_user = SimpleNamespace(id=1)
         self.answered: list[str] = []
-        self.edited_markup = None
+        self.edited_text = None
+        self.edited_markup = "unset"
 
     async def answer(self, text="", show_alert=False):
         self.answered.append(text)
 
-    async def edit_message_reply_markup(self, reply_markup=None):
+    async def edit_message_text(self, text, reply_markup=None):
+        self.edited_text = text
         self.edited_markup = reply_markup
 
 
-def test_done_button_removes_the_keyboard() -> None:
+def test_done_button_shows_current_language() -> None:
     query = FakeQuery()
     update = SimpleNamespace(callback_query=query)
     services = SimpleNamespace(
@@ -200,4 +203,5 @@ def test_done_button_removes_the_keyboard() -> None:
     asyncio.run(language_chosen(update, context))
 
     assert query.answered == ["Done."]
+    assert query.edited_text == "Current language: Amharic."
     assert query.edited_markup is None
