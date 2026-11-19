@@ -54,31 +54,42 @@ _COLORS = {
     "CRITICAL": "\033[1;31m",  # bold red
 }
 _RESET = "\033[0m"
+_DIM = "\033[2m"
 
 
-class _ColoredFormatter(logging.Formatter):
-    """Color the level name when writing to a real terminal."""
+class _CleanFormatter(logging.Formatter):
+    """Aligned, readable log lines. Color only on a real terminal."""
+
+    def __init__(self, debug: bool) -> None:
+        super().__init__(datefmt="%H:%M:%S")
+        self.debug = debug
 
     def format(self, record: logging.LogRecord) -> str:
-        message = super().format(record)
+        time_str = self.formatTime(record, self.datefmt)
+        level = record.levelname
+        # Shorten logger names: "src.handlers" -> "handlers", "telegram.ext" -> "telegram.ext"
+        name = record.name.removeprefix("src.")
+        # Pad for alignment.
+        level_padded = level.ljust(8)
+        name_padded = name.ljust(22)[:22]
+
+        message = record.getMessage()
+        if record.exc_info:
+            message = message + "\n" + self.formatException(record.exc_info)
+
         if sys.stdout.isatty():
-            color = _COLORS.get(record.levelname)
+            color = _COLORS.get(level, "")
             if color:
-                message = message.replace(
-                    record.levelname, f"{color}{record.levelname}{_RESET}", 1
-                )
-        return message
+                level_padded = f"{color}{level_padded}{_RESET}"
+            name_padded = f"{_DIM}{name_padded}{_RESET}"
+
+        return f"{_DIM}{time_str}{_RESET}  {level_padded}  {name_padded}  {message}"
 
 
 def setup_logging(debug: bool) -> None:
     """Configure one readable log stream for local use and systemd."""
     handler = logging.StreamHandler()
-    handler.setFormatter(
-        _ColoredFormatter(
-            fmt="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-    )
+    handler.setFormatter(_CleanFormatter(debug))
     root = logging.getLogger()
     root.setLevel(logging.DEBUG if debug else logging.INFO)
     # Replace any handlers added by imports (e.g. by libraries) with ours.
