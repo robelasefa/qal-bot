@@ -177,7 +177,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "How to use Qal:\n\n"
         "1. Send a voice message or an audio file.\n"
         "2. I transcribe it and reply with the text.\n\n"
-        "Use /language to pick a language."
+        "Use /language to pick a language. "
+        "After a transcript in Amharic, Afaan Oromo, or Tigrinya, "
+        "tap 'Translate to English'."
     )
 
 

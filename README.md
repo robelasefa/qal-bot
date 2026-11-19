@@ -32,6 +32,10 @@ Qal transcribes voice messages and audio files in Telegram using the Addis AI SD
 | `/help` | Usage, limits, privacy |
 | `/language` | Inline buttons for all seven languages |
 
+### Translation
+
+After a transcript in Amharic, Afaan Oromo, or Tigrinya, Qal shows a "Translate to English" button. Translation runs only when you tap it, costs Addis AI credits, and counts toward your hourly and daily limits. Transcripts are kept in memory for 15 minutes and never written to disk.
+
 ### Behaviour
 
 | Situation | What the user sees |
@@ -49,6 +53,7 @@ Qal transcribes voice messages and audio files in Telegram using the Addis AI SD
 | Connection drops after sending | The bot checks the same request and returns the transcript if it finished |
 | Unexpected bot error | A short apology; the owner gets one alert at most every five minutes |
 | No speech detected | “I could not hear any speech in that audio.” |
+| Transcript in am/om/ti | A "Translate to English" button appears |
 
 ## How it works
 
