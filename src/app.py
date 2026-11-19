@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from urllib.parse import urlparse
 
 from telegram import (
@@ -45,13 +46,43 @@ logger = logging.getLogger(__name__)
 ALLOWED_UPDATES = ["message", "callback_query"]
 
 
+_COLORS = {
+    "DEBUG": "\033[36m",     # cyan
+    "INFO": "\033[32m",      # green
+    "WARNING": "\033[33m",   # yellow
+    "ERROR": "\033[31m",     # red
+    "CRITICAL": "\033[1;31m",  # bold red
+}
+_RESET = "\033[0m"
+
+
+class _ColoredFormatter(logging.Formatter):
+    """Color the level name when writing to a real terminal."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        message = super().format(record)
+        if sys.stdout.isatty():
+            color = _COLORS.get(record.levelname)
+            if color:
+                message = message.replace(
+                    record.levelname, f"{color}{record.levelname}{_RESET}", 1
+                )
+        return message
+
+
 def setup_logging(debug: bool) -> None:
     """Configure one readable log stream for local use and systemd."""
-    logging.basicConfig(
-        level=logging.DEBUG if debug else logging.INFO,
-        format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        _ColoredFormatter(
+            fmt="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
     )
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG if debug else logging.INFO)
+    # Replace any handlers added by imports (e.g. by libraries) with ours.
+    root.handlers = [handler]
     # The Bot API client logs every GET/POST at INFO. Keep warnings and errors,
     # but do not let request-level noise bury the bot's own messages.
     logging.getLogger("httpx").setLevel(logging.WARNING)

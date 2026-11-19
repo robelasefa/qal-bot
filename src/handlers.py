@@ -98,15 +98,25 @@ def is_owner(services: Services, user_id: int) -> bool:
 
 def language_keyboard(current: str) -> InlineKeyboardMarkup:
     """One button per language, with a check mark on the current one."""
-    buttons = [
-        InlineKeyboardButton(
+    am_button = None
+    rest: list[InlineKeyboardButton] = []
+    for code, label in LANGUAGES.items():
+        button = InlineKeyboardButton(
             ("✅ " if code == current else "") + label,
             callback_data=f"lang:{code}",
         )
-        for code, label in LANGUAGES.items()
-    ]
-    rows = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
-    rows.append([InlineKeyboardButton("Done", callback_data="lang:done")])
+        if code == "am":
+            am_button = button
+        else:
+            rest.append(button)
+
+    rows: list[list[InlineKeyboardButton]] = []
+    if am_button is not None:
+        rows.append([am_button])
+    rows += [rest[i : i + 2] for i in range(0, len(rest), 2)]
+    rows.append(
+        [InlineKeyboardButton("Done", callback_data="lang:done", style="success")]
+    )
     return InlineKeyboardMarkup(rows)
 
 
@@ -354,10 +364,25 @@ async def translate_callback(
         logger.warning("Could not remove the translate button")
 
     target = query.message
+
+    # Show a loading message while the translation runs.
+    status = None
+    if target is not None:
+        try:
+            status = await target.reply_text("⏳ Translating...")
+        except TelegramError:
+            status = None
+
     try:
         translated = await translate_text(text, source, settings.addis_api_key)
     except TranslationError as exc:
-        if target is not None:
+        if status is not None:
+            try:
+                await status.edit_text(exc.user_message)
+            except TelegramError:
+                if target is not None:
+                    await target.reply_text(exc.user_message)
+        elif target is not None:
             await target.reply_text(exc.user_message)
         if exc.notify_owner:
             await alert_owner(
@@ -368,18 +393,42 @@ async def translate_callback(
         return
     except Exception:
         logger.exception("Unexpected error during translation: user=%s", user.id)
-        if target is not None:
+        if status is not None:
+            try:
+                await status.edit_text("Something went wrong. Please try again.")
+            except TelegramError:
+                if target is not None:
+                    await target.reply_text("Something went wrong. Please try again.")
+        elif target is not None:
             await target.reply_text("Something went wrong. Please try again.")
         return
 
     chunks = split_text(translated)
     if not chunks:
-        if target is not None:
+        if status is not None:
+            try:
+                await status.edit_text("Translation returned no text.")
+            except TelegramError:
+                pass
+        elif target is not None:
             await target.reply_text("Translation returned no text.")
         return
     if target is None:
+        if status is not None:
+            try:
+                await status.delete()
+            except TelegramError:
+                pass
         return
-    for chunk in chunks:
+    if status is not None:
+        try:
+            await status.edit_text(chunks[0], link_preview_options=NO_LINK_PREVIEW)
+        except TelegramError:
+            await target.reply_text(chunks[0], link_preview_options=NO_LINK_PREVIEW)
+            status = None
+    else:
+        await target.reply_text(chunks[0], link_preview_options=NO_LINK_PREVIEW)
+    for chunk in chunks[1:]:
         await target.reply_text(chunk, link_preview_options=NO_LINK_PREVIEW)
 
 
@@ -551,7 +600,7 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if translatable and sent:
         key = services.translations.put(text, language, user.id)
         keyboard = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("Translate to English", callback_data=f"tr:{key}")]]
+            [[InlineKeyboardButton("Translate to English", callback_data=f"tr:{key}", style="primary")]]
         )
         try:
             await sent[-1].edit_reply_markup(reply_markup=keyboard)
