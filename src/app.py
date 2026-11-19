@@ -31,6 +31,7 @@ from .handlers import (
     language_command,
     start,
     stats_command,
+    translate_callback,
 )
 from .languages import LanguageStore
 from .rate_limit import DailyBudget, RateLimiter
@@ -118,6 +119,9 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(
         CallbackQueryHandler(language_chosen, pattern=r"^lang:")
+    )
+    application.add_handler(
+        CallbackQueryHandler(translate_callback, pattern=r"^tr:")
     )
     application.add_handler(
         MessageHandler(filters.VOICE | filters.AUDIO, handle_audio)

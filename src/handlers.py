@@ -31,7 +31,12 @@ from .languages import DEFAULT_LANGUAGE, LANGUAGES, LanguageStore, language_labe
 from .rate_limit import DailyBudget, RateLimiter
 from .stats import Stats
 from .transcriber import TranscriptionError, fetch_usage, transcribe_audio
-from .translation import TranslationCache, is_translatable
+from .translation import (
+    TranslationCache,
+    TranslationError,
+    is_translatable,
+    translate_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -285,6 +290,95 @@ async def language_chosen(
         )
     except TelegramError:
         logger.warning("Could not edit the language message")
+
+
+async def translate_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    query = update.callback_query
+    if query is None or not query.data or not query.data.startswith("tr:"):
+        return
+
+    user = query.from_user
+    if user is None:
+        return
+
+    services: Services = context.application.bot_data["services"]
+    settings = services.settings
+
+    if not is_allowed(services, user.id):
+        await query.answer("This bot is private.", show_alert=True)
+        return
+
+    key = query.data[3:]
+    entry = services.translations.get(key)
+    if entry is None:
+        await query.answer(
+            "Translation expired. Send the audio again.", show_alert=True
+        )
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except TelegramError:
+            logger.warning("Could not remove the translate button")
+        return
+
+    text, source = entry
+
+    # Respect the per-user hourly limit.
+    if not services.limiter.allow(user.id):
+        wait = services.limiter.retry_after(user.id)
+        await query.answer(
+            f"Rate limit: try again in about {format_wait(wait)}.",
+            show_alert=True,
+        )
+        return
+
+    # Respect the shared daily budget.
+    if services.daily.remaining() <= 0:
+        await query.answer(
+            "Qal has reached today's limit. Try again tomorrow.",
+            show_alert=True,
+        )
+        return
+    services.daily.allow()
+
+    services.stats.record_user(user.id)
+    await query.answer("Translating...")
+
+    # Remove the button so it can't be tapped twice.
+    try:
+        await query.edit_message_reply_markup(reply_markup=None)
+    except TelegramError:
+        logger.warning("Could not remove the translate button")
+
+    target = query.message
+    try:
+        translated = await translate_text(text, source, settings.addis_api_key)
+    except TranslationError as exc:
+        if target is not None:
+            await target.reply_text(exc.user_message)
+        if exc.notify_owner:
+            await alert_owner(
+                context,
+                "⚠️ Addis AI credits are used up.\n"
+                "Top up the account so translation can continue.",
+            )
+        return
+    except Exception:
+        logger.exception("Unexpected error during translation: user=%s", user.id)
+        if target is not None:
+            await target.reply_text("Something went wrong. Please try again.")
+        return
+
+    chunks = split_text(translated)
+    if not chunks:
+        if target is not None:
+            await target.reply_text("Translation returned no text.")
+        return
+    if target is None:
+        return
+    for chunk in chunks:
+        await target.reply_text(chunk, link_preview_options=NO_LINK_PREVIEW)
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
