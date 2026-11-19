@@ -31,7 +31,7 @@ from .languages import DEFAULT_LANGUAGE, LANGUAGES, LanguageStore, language_labe
 from .rate_limit import DailyBudget, RateLimiter
 from .stats import Stats
 from .transcriber import TranscriptionError, fetch_usage, transcribe_audio
-from .translation import TranslationCache
+from .translation import TranslationCache, is_translatable
 
 logger = logging.getLogger(__name__)
 
@@ -435,12 +435,29 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         elapsed,
     )
 
+    translatable = is_translatable(language)
+
+    sent: list[Message] = []
     try:
-        await status.edit_text(chunks[0], link_preview_options=NO_LINK_PREVIEW)
+        edited = await status.edit_text(chunks[0], link_preview_options=NO_LINK_PREVIEW)
+        sent.append(edited if isinstance(edited, Message) else status)
     except TelegramError:
         for chunk in chunks:
-            await message.reply_text(chunk, link_preview_options=NO_LINK_PREVIEW)
-        return
+            sent.append(
+                await message.reply_text(chunk, link_preview_options=NO_LINK_PREVIEW)
+            )
+    else:
+        for chunk in chunks[1:]:
+            sent.append(
+                await message.reply_text(chunk, link_preview_options=NO_LINK_PREVIEW)
+            )
 
-    for chunk in chunks[1:]:
-        await message.reply_text(chunk, link_preview_options=NO_LINK_PREVIEW)
+    if translatable and sent:
+        key = services.translations.put(text, language, user.id)
+        keyboard = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Translate to English", callback_data=f"tr:{key}")]]
+        )
+        try:
+            await sent[-1].edit_reply_markup(reply_markup=keyboard)
+        except TelegramError:
+            await message.reply_text("Translate to English", reply_markup=keyboard)
