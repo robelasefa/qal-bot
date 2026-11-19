@@ -35,6 +35,7 @@ from .handlers import (
 from .languages import LanguageStore
 from .rate_limit import DailyBudget, RateLimiter
 from .stats import Stats
+from .translation import TranslationCache
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ def build_application(settings: Settings) -> Application:
         ),
         transcribe_slots=asyncio.Semaphore(settings.transcribe_concurrency),
         stats=Stats(),
+        translations=TranslationCache(),
     )
 
     application = (

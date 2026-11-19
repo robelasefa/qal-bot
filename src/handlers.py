@@ -31,6 +31,7 @@ from .languages import DEFAULT_LANGUAGE, LANGUAGES, LanguageStore, language_labe
 from .rate_limit import DailyBudget, RateLimiter
 from .stats import Stats
 from .transcriber import TranscriptionError, fetch_usage, transcribe_audio
+from .translation import TranslationCache
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ class Services:
     daily: DailyBudget
     transcribe_slots: asyncio.Semaphore
     stats: Stats
+    translations: TranslationCache
 
 
 def is_allowed(services: Services, user_id: int) -> bool:
