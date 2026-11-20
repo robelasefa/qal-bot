@@ -25,6 +25,7 @@ from .config import ConfigError, Settings, load_settings
 from .error import error_handler
 from .handlers import (
     Services,
+    boom,
     handle_audio,
     handle_text,
     help_command,
@@ -170,6 +171,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(
         CallbackQueryHandler(translate_callback, pattern=r"^tr:")
     )
+    application.add_handler(CommandHandler("boom", boom))  # for testing error alerts
     application.add_handler(
         MessageHandler(filters.VOICE | filters.AUDIO, handle_audio)
     )

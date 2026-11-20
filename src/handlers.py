@@ -606,3 +606,7 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await sent[-1].edit_reply_markup(reply_markup=keyboard)
         except TelegramError:
             await message.reply_text("Translate to English", reply_markup=keyboard)
+
+
+async def boom(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    raise ValueError("test alert from Qal")

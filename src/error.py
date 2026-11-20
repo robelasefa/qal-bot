@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+import traceback
 from typing import TYPE_CHECKING
 
 from telegram import Update
@@ -48,15 +49,23 @@ def format_error_notice(error, update, redact=None) -> str:
     if len(detail) > 300:
         detail = detail[:297] + "..."
 
+    tb_lines = traceback.format_exception(type(error), error, error.__traceback__)
+    if len(tb_lines) > 12:
+        tb_lines = ["...\n"] + tb_lines[-12:]
+    tb_text = "".join(tb_lines).strip()
+
     notice = (
         "⚠️ Qal hit an unexpected error.\n\n"
         f"Type: {type(error).__name__}\n"
         f"Update: {update_kind(update)}\n"
         f"Detail: {detail or 'no detail'}\n\n"
-        "The full traceback is in the server logs."
+        f"Traceback:\n{tb_text}\n\n"
+        "Full traceback is in the server logs."
     )
     if redact is not None:
         notice = redact(notice)
+    if len(notice) > 4000:
+        notice = notice[:3997] + "..."
     return notice
 
 

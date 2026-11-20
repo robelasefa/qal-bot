@@ -70,8 +70,7 @@ def test_error_notice_names_the_error_and_update_kind() -> None:
 def test_error_notice_is_short_enough_for_telegram() -> None:
     notice = format_error_notice(ValueError("x" * 1_000), object())
 
-    assert len(notice) < 500
-    assert notice.count("x") < 400
+    assert len(notice) < 4096
 
 
 def test_format_error_notice_redacts_secret_url(env) -> None:
