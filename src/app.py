@@ -60,10 +60,10 @@ _DIM = "\033[2m"
 class _CleanFormatter(logging.Formatter):
     """Aligned, readable log lines. Color only on a real terminal."""
 
-    def __init__(self, debug: bool, token: str | None = None) -> None:
+    def __init__(self, debug: bool, redact=None) -> None:
         super().__init__(datefmt="%H:%M:%S")
         self.debug = debug
-        self.token = token or ""
+        self.redact = redact
 
     def format(self, record: logging.LogRecord) -> str:
         time_str = self.formatTime(record, self.datefmt)
@@ -86,15 +86,15 @@ class _CleanFormatter(logging.Formatter):
             name_padded = f"{_DIM}{name_padded}{_RESET}"
 
         result = f"{time_str}  {level_padded}  {name_padded}  {message}"
-        if self.token:
-            result = result.replace(self.token, "***")
+        if self.redact is not None:
+            result = self.redact(result)
         return result
 
 
-def setup_logging(debug: bool, token: str | None = None) -> None:
+def setup_logging(debug: bool, redact=None) -> None:
     """Configure one readable log stream for local use and systemd."""
     handler = logging.StreamHandler()
-    handler.setFormatter(_CleanFormatter(debug, token))
+    handler.setFormatter(_CleanFormatter(debug, redact))
     root = logging.getLogger()
     root.setLevel(logging.DEBUG if debug else logging.INFO)
     # Replace any handlers added by imports (e.g. by libraries) with ours.
@@ -215,7 +215,7 @@ def main() -> None:
     except ConfigError as exc:
         raise SystemExit(f"Configuration error: {exc}") from exc
 
-    setup_logging(settings.debug, settings.telegram_token)
+    setup_logging(settings.debug, settings.redact)
 
     logger.info(
         "Starting Qal in %s mode (max_audio_seconds=%s, "

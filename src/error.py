@@ -42,19 +42,22 @@ def update_kind(update: object) -> str:
     return "other update"
 
 
-def format_error_notice(error: BaseException, update: object) -> str:
+def format_error_notice(error, update, redact=None) -> str:
     """Build the short owner alert. Never include the update payload."""
     detail = " ".join(str(error).split())
     if len(detail) > 300:
         detail = detail[:297] + "..."
 
-    return (
+    notice = (
         "⚠️ Qal hit an unexpected error.\n\n"
         f"Type: {type(error).__name__}\n"
         f"Update: {update_kind(update)}\n"
         f"Detail: {detail or 'no detail'}\n\n"
         "The full traceback is in the server logs."
     )
+    if redact is not None:
+        notice = redact(notice)
+    return notice
 
 
 async def alert_owner(context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
@@ -88,4 +91,6 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     if not is_critical_error(error):
         return
 
-    await alert_owner(context, format_error_notice(error, update))
+    services = context.application.bot_data.get("services")
+    redact = getattr(services.settings, "redact", None) if services is not None else None
+    await alert_owner(context, format_error_notice(error, update, redact=redact))

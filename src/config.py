@@ -182,6 +182,17 @@ class Settings:
         """Human-readable mode for startup logs."""
         return "development" if self.debug else "production"
 
+    def redact(self, text: str) -> str:
+        """Replace known secrets in ``text`` with ``***``.
+
+        Empty or very short values are skipped so a blank token can never
+        wipe out unrelated text.
+        """
+        for secret in (self.telegram_token, self.webhook_secret, self.addis_api_key):
+            if secret and len(secret) >= 8:
+                text = text.replace(secret, "***")
+        return text
+
 
 def load_settings() -> Settings:
     """Load settings from .env, raising ConfigError if something is wrong."""

@@ -74,6 +74,47 @@ def test_error_notice_is_short_enough_for_telegram() -> None:
     assert notice.count("x") < 400
 
 
+def test_format_error_notice_redacts_secret_url(env) -> None:
+    token = "123456:ABC-DEF_secret"
+    env.setenv("TELEGRAM_DEV_BOT_TOKEN", token)
+    env.setenv("ADDIS_API_KEY", "addis-key-12345678")
+
+    from src.config import load_settings
+
+    settings = load_settings()
+    url = f"https://api.telegram.org/bot{token}/getMe"
+    notice = format_error_notice(
+        ValueError(f"failed {url}"), object(), redact=settings.redact
+    )
+
+    assert token not in notice
+    assert "***" in notice
+
+
+def test_redact_skips_empty_and_short_secrets() -> None:
+    from src.config import Settings
+
+    settings = Settings(
+        telegram_token="",
+        addis_api_key="ab",
+        max_audio_seconds=600,
+        rate_limit_per_hour=5,
+        allowed_user_ids=frozenset(),
+        owner_user_id=None,
+        daily_transcription_limit=100,
+        transcribe_concurrency=2,
+        debug=True,
+        webhook_url=None,
+        webhook_secret="short",
+        webhook_listen="127.0.0.1",
+        webhook_port=8080,
+        data_dir=__import__("pathlib").Path("/tmp"),
+    )
+
+    text = "nothing secret here"
+    assert settings.redact(text) == text
+
+
 def test_error_handler_alerts_the_owner_about_code_errors() -> None:
     bot = FakeBot()
     data = owner_data()
